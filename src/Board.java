@@ -27,14 +27,14 @@ public class Board {
                 int[][] tempBoard = new int[width][height];
                 int x = 0, y = 0;
                 while (contents.hasMoreElements()) {
-                     tempBoard[y][x++] = Integer.parseInt(contents.nextToken());
-                     if (x >= width) {
-                         x = 0;
-                         y++;
-                         if (y >= height) {
-                             throw new IllegalArgumentException("Found more clues than fit within the given dimensions");
-                         }
-                     }
+                    if (y >= height) {
+                        throw new IllegalArgumentException("Found more clues than fit within the given dimensions");
+                    }
+                    tempBoard[y][x++] = Integer.parseInt(contents.nextToken());
+                    if (x >= width) {
+                        x = 0;
+                        y++;
+                    }
                 }
 
                 if (type.equals("c")) { this.cboard = tempBoard; }
@@ -85,39 +85,94 @@ public class Board {
         return name + ", " + width + "x" + height + ", " + difficulty;
     }
 
-    private static class SolvingBoard {
+    public static class SolvingBoard {
         private Board parent;
         int width, height;
         private int[][] board;
+        int unsure;
 
-        private enum CellStates {;public final static int FILLED = 1, EMPTY = 0, UNSURE = -1;}
+        public enum CellStates {;public final static int FILLED = 1, EMPTY = 0, UNSURE = -1;}
 
         public SolvingBoard(Board parent) {
             this.parent = parent;
-            int width = parent.width+4;
-            int height = parent.height+4;
+            this.width = parent.width+4;
+            this.height = parent.height+4;
             this.board = new int[width][height];
+            this.unsure = 0;
 
             for (int i = 0; i<height; i++) {
                 for (int j = 0; j < width; j++) {
                     if (i < 2 || i >= width-2 || j < 2 || j >= width-2) { board[i][j] = -2; }
-                    else { board[i][j] = -1; }
+                    else {
+                        board[i][j] = -1;
+                        unsure++;
+                    }
                 }
             }
         }
 
         public void setCell(int state, int x, int y) {
+            if (this.board[y+2][x+2] == -1) { unsure--; }
+            if (state == -1) { unsure++; }
             this.board[y+2][x+2] = state;
+        }
+
+        public int getCell(int x, int y) {
+            if ((x<2||x>=width-2)||(y<2||y>=height-2)) {
+                throw new IllegalArgumentException("Coordinates out of bounds");
+            }
+            return this.board[y][x];
+        }
+
+        public int[][] getCellGroup(int x, int y){
+            if ((x<2||x>=width-2)||(y<2||y>=height-2)) {
+                throw new IllegalArgumentException("Coordinates out of bounds");
+            }
+
+            int[][] group = new int[3][3];
+            for (int i = x-1; i<=x+1; i++) {
+                for (int j = y-1; j<=y+1; y++) {
+                    group[j-(y-1)][i-(x-1)] = this.board[j][i];
+                }
+            }
+            return group;
         }
 
         public int checkErrors() {
             int errors = 0;
             for (int i = 2; i < width-2; i++) {
                 for (int j = 2; j < height-2; j++) {
-                    if (parent.getSolutionAt(i-2, j-2) != this.board[j][i]) { errors++; }
+                    if (this.board[j][i] != -1 && parent.getSolutionAt(i-2, j-2) != this.board[j][i]) { errors++; }
                 }
             }
             return errors;
+        }
+
+        public boolean isFinished() {
+            return ( this.unsure == 0 && checkErrors() == 0);
+        }
+
+        @Override
+        public String toString() {
+            String s = "";
+            for (int i = 1; i<height-1; i++) {
+                for (int j = 1; j<width-1; j++) {
+                    int cell = this.board[i][j];
+                    if (cell == -2) {
+                        s += "▓▓";
+                    } else if (cell == -1) {
+                        if (parent.getClueAt(j-2, i-2) > -1) {
+                            s += " " + parent.getClueAt(j-2, i-2);
+                        } else {
+                            s += "  ";
+                        }
+                    } else {
+                        s += (cell == 1) ? "██" : "░░";
+                    }
+                }
+                s += "\n";
+            }
+            return s;
         }
     }
 }
